@@ -1,0 +1,378 @@
+<!-- Presented here is the layout to a 'Raindrops Hitting Words' javaescipt page -->
+<!-- The idea is that raindrops are to be created at a random interval to fall from the top of the screen-->
+<!-- The raindrops fall and hit words that are displayed on the page-->
+<!-- The raindrops disappear when they hit another word-->
+ 
+<!doctype html>
+<html>
+    
+     
+   <head>
+          
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          
+      <style>
+                 border: 1px solid #d3d3d3;
+                 background-color: #f1f1f1;
+               }
+          
+             
+      </style>
+        
+   </head>
+    
+     
+   <body onload="startGame()" onresize="">
+       <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+       <script src="https://cdn.rawgit.com/mohayonao/web-audio-api-shim/master/build/web-audio-api-shim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/1.0.0/fetch.min.js"></script>
+  <script src="musicforairports.js"></script>
+          <script>
+var myWords = [];
+
+var myWordsMirror = [];
+var myRaindrops = [];
+var myScore;
+var myWordsMirrorArray = [];
+var WordHolder = [];
+var words;
+
+//startGame() adds all the words to the site by storing them in a myWords[] array
+//the funtion then runs myGameArea.start()
+
+function startGame() {
+    var seperatedWords = readTextFile('http://ilyam.emerson.build/data/test.txt');
+        console.log(seperatedWords); 
+        loop();
+        myGameArea.start(); 
+}
+ 
+              
+function loop() {
+        var rand = Math.floor((Math.random() * 4000));
+        setTimeout(function() {
+                  myWords.push(new component(100 + "px", "word", 'red', Math.random() * window.innerWidth, Math.random() * window.innerHeight, 0, 'Poetry', 'text', false));
+        loop();
+                   }, rand);
+      
+}              
+// Calculates the X and Y coordinates and Size for next word, pushes the new word into MyWords
+// and deletes the previous one
+function createInfinity(Word) {
+    
+    var rateOfChangeDistanceX = 0;
+    var rateOfChangeDistanceY = 0;
+    var rateOfChangeSize = 0;
+    var originX = Word.x;
+    var originY = Word.y;
+    var originSize = Word.width;
+    
+    // calculates the center of the page
+    var xCord = window.innerWidth - (window.innerWidth / 2);
+    var yCord = window.innerHeight - (window.innerHeight / 2);
+    
+    
+    // calculates the distance from the word's X and Y coordinates from their respective Axis
+    var distanceX = xCord - Word.x;
+    var distanceY = Word.y - yCord;
+    
+    // some values of the first word have to be stored, if initial word is true than certain values are saved in WordDistanceHolder[]
+    
+    if (parseInt(Word.width) < .001) {
+        remove(myWords, Word);
+    }
+    else {
+    
+  if (Word.hit == false) {
+    
+    // rateOfWords determines how many words will appear between the origin and the center
+    // ex: if the distance is 100, rateOfWords is 2, 100/2 will mean 50 words appear from the original to the center
+    var rateOfWords = 2;
+      
+    // Uses distance formula to calculate the distance diagonally and stores it in a distance variable
+    var distance = Math.sqrt(Math.pow((Word.x - xCord), 2) + Math.pow((Word.y - yCord), 2));
+      
+    var originX = Word.x;
+    var originY = Word.y;
+    var originSize = Word.width;
+      
+    // calculates the rate of change per X and Y coordinate seperately
+    // ex: if distance from X axis is 200, distance from center is 100, and rateOfWords is 2
+    //     then the rate of change per iteration is 200/100/2 which is + 4 per iteration
+    rateOfChangeDistanceX = (distanceX / (distance / rateOfWords));
+    rateOfChangeDistanceY = (distanceY / (distance / rateOfWords));
+      
+    // Changes rate of size change per distance/rateOfWords
+    rateOfChangeSize = rateOfChangeSize + (parseInt(Word.width) / (distance / rateOfWords));
+      
+    // Stores relevant initial information from the fist word such as
+    //  1. The initial rate of change for X and Y per iteration
+    //  2. The initial rate of change for size per iteration
+    var Rates = new wordDistance((distanceX / (distance / rateOfWords)), (distanceY / (distance / rateOfWords)), (parseInt(Word.width) / (distance / rateOfWords)));
+    
+    
+    // creates a new word in MyWords by
+    // 1. subtracting the rate of change size from the word's current size
+    // 2. adding the rate of change X to the word's current X
+    // 3. subtracts the rate of change Y to the word's current Y because in canvas Y axis is    //    flipped
+    myWords.push(new component(Math.abs((parseInt(Word.width) - rateOfChangeSize)) + "px", "word", 'red', (originX + rateOfChangeDistanceX), (originY - rateOfChangeDistanceY), Rates, 'Pineapple', 'text', true));
+    
+    // Once new word is added the previous word is removed
+    remove(myWords, Word);
+      
+  } 
+    
+    // if the word is not the original stored values are used instead of stored
+    else {
+
+    // The rate of change in X and Y are calculated on the stored rate of change    
+    rateOfChangeDistanceX = Word.speedX.rateX;
+    rateOfChangeDistanceY = Word.speedX.rateY;
+    rateOfChangeSize = Word.speedX.rateSize;
+    if ((parseInt(Word.width) - rateOfChangeSize) > 0) {
+        myWords.push(new component((parseInt(Word.width) - rateOfChangeSize) + "px", "word", 'red', (originX + rateOfChangeDistanceX), (originY - rateOfChangeDistanceY), Word.speedX, 'Pineapple', 'text', true));
+        remove(myWords, Word);
+    }   
+    else {
+    remove(myWords, Word);
+    }
+  }
+    }
+}
+
+//play area empty initially
+//adjust SIZE by adjusting canvas.width + canvas.height-->
+var myGameArea = {
+
+  canvas: document.createElement("canvas"),
+  // Start creates the canvas and sets the interval at which it runs-->
+  // updateGameArea every x frames--
+  start: function() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.context = this.canvas.getContext("2d");
+    document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+    this.frameNo = 0;
+    this.interval = setInterval(updateArea, 20);
+  },
+  clear: function() {
+    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+}
+
+function wordDistance(rateX, rateY, rateSize) {
+    this.rateX = rateX;
+    this.rateY = rateY;
+    this.rateSize = rateSize;
+}
+             
+
+function readTextFile(file)
+{
+    var rawFile = new XMLHttpRequest();
+    
+    rawFile.open("GET", file, true);
+    rawFile.onreadystatechange = function ()
+    {
+       if(rawFile.readyState === 4)
+        {
+            if(rawFile.status === 200 || rawFile.status == 0)
+            {
+                var allText = rawFile.responseText;
+                var text = allText.split(" ");
+                //pushes the initial word to start the game
+                words = text;
+            }
+        }
+    }
+    rawFile.send(null);
+}
+              
+//components are the objects that can interact with each other-->
+// width & height adjust image size-->
+//Color adjusts image color-->
+// x & y adjust image coordinates-->
+// type determines whether its a word or an image-->
+// hit determines if an image is hit -->
+
+function component(width, height, color, x, y, speedX, speedY, type, hit) {
+  this.type = type;
+  this.score = 0;
+  this.width = width;
+  this.height = height;
+  this.speedX = speedX;
+  this.speedY = speedY;
+  this.x = x;
+  this.y = y;
+  this.hit = hit;
+    this.color = color;
+    this.text = speedY;
+
+  // if object is an image  set extra image variable -->
+  if (type == "image" || type == "background") {
+    this.image = new Image();
+    this.image.src = color;
+  }
+
+  // creates image based on image type if 'hit = false' -->
+  // if 'hit = true' image is not created-->
+  // text uses internal tex data and width x height, x, y-->
+  // image pulls image from a url-->
+  this.update = function() {
+    if (this.hit == false) {
+      return;
+    } else if (this.y > myGameArea.canvas.height) {
+      remove(myRaindrops, this)
+    } else {
+      ctx = myGameArea.context;
+      if (type == "image" || type == "background") {
+        ctx.drawImage(this.image,
+          this.x, this.y, this.width, this.height);
+        if (type == "background") {
+          ctx.drawImage(this.image,
+            this.x + this.width, this.y, this.width, this.height);
+        }
+      } else {
+        (this.type == "text")
+        ctx.font = this.width + " " + this.height;
+        ctx.fillStyle = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+      }
+    }
+  }
+
+  // newPos determines the new position of an object based on their speed-->
+  // if speedx is negative object travels ^-->
+  // if speedx is positive object travels Down-->
+  // if speedy is negative object travels <-->
+  // if speedy is positve object travels >-->
+
+  this.newPos = function() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    if (this.type == "background") {
+      if (this.x == -(this.width)) {
+        this.x = 0;
+      }
+    }
+  }
+
+  function getWidthOfText(txt, fontname, fontsize) {
+    if (getWidthOfText.c === undefined) {
+      getWidthOfText.c = document.createElement('canvas');
+      getWidthOfText.ctx = getWidthOfText.c.getContext('2d');
+    }
+    getWidthOfText.ctx.font = fontsize + ' ' + fontname;
+    return getWidthOfText.ctx.measureText(txt).width;
+  }
+
+  //CrashWith determines whether two images collde in the canvas-->
+  // CrashWith pulls the x & y coordinates of both objects-->
+  // the function then compares that the coordinates do not intersect for either object-->
+
+  this.crashWith = function(otherobj) {
+    if (otherobj.hit == true) {
+      return;
+    }
+    var myleft = this.x;
+    var myright = this.x + this.width; // + (this.width);
+    var mytop = this.y;
+    var mybottom = this.y + this.height; // + ((this.width - 'px'));
+    var otherleft = otherobj.x; //otherobj.x;
+    var otherright = otherobj.x + (parseInt(otherobj.width) * 3); //otherobj.x + (getWidthOfText('word', '', '10px'));
+    var othertop = otherobj.y; //otherobj.y;
+    var otherbottom = otherobj.y + (parseInt(otherobj.width) / 2); //otherobj.y + (otherobj.height);
+    var crash = true;
+    if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+      crash = false;
+    }
+    return crash;
+  }
+}
+
+// Remove filters() an element from an array : → https: //blog.mariusschulz.com/2016/07/16/removing-elements-from-javascript-arrays-->
+function remove(array, element) {
+  const index = array.indexOf(element);
+
+  if (index !== -1) {
+    array.splice(index, 1);
+  }
+}
+
+
+// UpdateArea determines whether objects listed in the myWords[i] & myRaindrops[j] collide-->
+// Compares MyRaindropsi to MyWordsj+1-->
+// If Raindrop hits a Word then Raindrop is removed from myRaindrops array-->
+// Word has its variable 'hit' changed to 'true'-->
+// The gameArea is cleared-->
+// A new Raindrop is created -->
+// All raindrops in the myRaindrops[] array are moved down one x-->
+// Words position are updated-->
+
+function updateArea() {
+  for (i = 0; i < myRaindrops.length; i += 1) {
+    for (j = 0; j < myWords.length; j += 1)
+      if (myRaindrops[i].crashWith(myWords[j])) {
+        remove(myRaindrops, myRaindrops[i]);
+        playSample('Grand Piano', Notes[Math.floor(Math.random() * Notes.length)] + Octaves[Math.floor(Math.random() * Octaves.length)]);
+        createInfinity(myWords[j]);
+        myWords[j].hit = true;
+      }
+  }
+
+  // Clear; clears the canvas area of all objects-->
+
+  myGameArea.clear();
+
+  myGameArea.canvas.width = window.innerWidth;
+  myGameArea.canvas.height = window.innerHeight;
+
+  // Creats new raindrop at the rate of x (everyinterval x)-->
+  // New Raindrop begins at x=0 and a random location between canvas Width-->
+  // Pushes new raindrop into myRaindrops[i] -->
+  // Updates myRaindrops to be x - 1 position-->
+  // Updates myWords to be in same position-->
+  myGameArea.frameNo += 1;
+  var randomY = Math.floor(Math.random() * myGameArea.canvas.width);
+  // every interval sets rate that 'raindrops' appear
+  if (myGameArea.frameNo == 1 || everyinterval(3)) {  
+    var I = (Math.random() * 25); 
+    myRaindrops.push(new component(I * 2, I * 2, "raindrop.png", Math.random() * window.innerWidth, 5, 0, (I / 5), "image", true));
+
+  }
+  for (i = 0; i < myRaindrops.length; i += 1) {
+    myRaindrops[i].y += (1 + myRaindrops[i].speedY);
+    myRaindrops[i].text = "Raindrop";
+    myRaindrops[i].update();
+
+  }
+    
+    // iterates through myWords and checks if they are hit
+    // if the words are hit
+  for (i = 0; i < myWords.length; i += 1) {
+    
+    if (myWords[i].hit == true) {
+        createInfinity(myWords[i]);
+    } 
+  }
+    for (i = 0; i < myWords.length; i += 1) {
+    myWords[i].update();
+    }
+}
+
+
+function everyinterval(n) {
+  if ((myGameArea.frameNo / n) % 1 == 0) {
+    return true;
+  }
+  return false;
+}
+
+          
+             
+      </script>
+        
+   </body>
+    
+</html>
+ 
